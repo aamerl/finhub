@@ -1,0 +1,4 @@
+confluent-kafka
+websocket-client
+finnhub-python
+fastavro
