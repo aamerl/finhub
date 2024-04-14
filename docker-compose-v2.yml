@@ -1,26 +1,33 @@
+version: '3.8'
+
 services:
   zookeeper:
-    image: wurstmeister/zookeeper
+    image: bitnami/zookeeper:3.9.2
     container_name: zookeeper
     hostname: zookeeper
-    ports:
-      - "2181:2181"
-
+    networks:
+      - finhub
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: yes
   kafka:
-    image: wurstmeister/kafka
+    image: bitnami/kafka:3.6.2
     hostname: kafka
     container_name: kafka
-    ports:
-      - "9092:9092"
+    depends_on:
+      - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
       KAFKA_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
-
+    volumes:
+      - ./init-kafka.sh:/init-kafka.sh
+    networks:
+      - finhub
+    # command: /bin/bash -c "chmod a+x ./init-kafka.sh && /init-kafka.sh"
   schema-registry:
-    image: confluentinc/cp-schema-registry:latest
+    image: bitnami/schema-registry:7.6.1
     container_name: schema-registry
     hostname: schema-registry
     depends_on:
@@ -33,3 +40,9 @@ services:
       SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
       SCHEMA_REGISTRY_DEBUG: 'true'
+    networks:
+      - finhub
+
+networks:
+  finhub:
+    name: finhub

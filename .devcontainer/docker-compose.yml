@@ -1,5 +1,6 @@
 version: '3.8'
 
+# https://github.com/bitnami/containers/blob/main/bitnami/schema-registry/docker-compose.yml
 services:
   app:
     build:
@@ -7,35 +8,35 @@ services:
       dockerfile: .devcontainer/Dockerfile
     volumes:
       - ../..:/workspaces:cached
-    # Overrides default command so things don't shut down after the process ends.
     command: sleep infinity
-    # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
     network_mode: service:kafka
-    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
-    # (Adding the "ports" property to this file will not forward from a Codespace.)
-
   zookeeper:
-    image: wurstmeister/zookeeper
+    image: bitnami/zookeeper:3.9.2
     container_name: zookeeper
     hostname: zookeeper
-    ports:
-      - "2181:2181"
-
+    networks:
+      - finhub
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: yes
   kafka:
-    image: wurstmeister/kafka
+    image: bitnami/kafka:3.6.2
     hostname: kafka
     container_name: kafka
-    ports:
-      - "9092:9092"
+    depends_on:
+      - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
       KAFKA_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
-
+    volumes:
+      - ../init-kafka.sh:/init-kafka.sh
+    networks:
+      - finhub
+    # command: /bin/bash -c "chmod a+x ./init-kafka.sh && ./init-kafka.sh"
   schema-registry:
-    image: confluentinc/cp-schema-registry:latest
+    image: bitnami/schema-registry:7.6
     container_name: schema-registry
     hostname: schema-registry
     depends_on:
@@ -43,8 +44,11 @@ services:
     ports:
       - "8081:8081"
     environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
-      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
-      SCHEMA_REGISTRY_DEBUG: 'true'
+      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
+      - SCHEMA_REGISTRY_KAFKA_BROKERS=PLAINTEXT://kafka:9092
+    networks:
+      - finhub
+
+networks:
+  finhub:
+    name: finhub
