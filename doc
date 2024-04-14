@@ -5,5 +5,4 @@ kafka-topics.sh --create -bootstrap-server localhost:9092 --replication-factor 1
 
 9cdeef654c96
 
-# BPj1/erb
 git config --global user.name "aamerl"
