@@ -18,8 +18,8 @@ services:
       FINHUB_SYMBOLS: "BINANCE:BTCUSDT,AAPL"
       FINHUB_SECRET_KEY: ${FINHUB_SECRET_KEY}
       FINHUB_API_URL: "wss://ws.finnhub.io?token="
-      FINHUB_TRACE: true
-      FIRST_RUN: true
+      FINHUB_TRACE: false
+      FIRST_RUN: false
   kafka-0:
     image: docker.io/bitnami/kafka:${BITNAMI_KAFKA_VERSION}
     hostname: kafka-0
