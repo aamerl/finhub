@@ -31,3 +31,11 @@ repos:
             stages: [commit, push]
             types: [python]
             language_version: python3
+    - repo: local
+      hooks:
+          - id: tests
+            name: run tests
+            entry: python -m unittest
+            types: [python]
+            stages: [commit, push]
+            language: system

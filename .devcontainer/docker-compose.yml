@@ -40,6 +40,8 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     volumes:
       - 'kafka0_data:/bitnami/kafka'
+      - ../init-kafka.sh:/init-kafka.sh
+    # command: /bin/bash -c "chmod a+x ./init-kafka.sh && ./init-kafka.sh"
   kafka-1:
     image: docker.io/bitnami/kafka:${BITNAMI_KAFKA_VERSION}
     hostname: kafka-1
@@ -60,8 +62,6 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     volumes:
       - 'kafka1_data:/bitnami/kafka'
-      - ../init-kafka.sh:/init-kafka.sh
-    # command: /bin/bash -c "chmod a+x ./init-kafka.sh && ./init-kafka.sh"
   schema-registry:
     image: docker.io/bitnami/schema-registry:7.6
     container_name: schema-registry

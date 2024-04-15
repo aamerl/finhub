@@ -22,7 +22,13 @@ def send_message_to_kafka(data):
         )
         logging.info(f"trade schema sent to schema registry with id  {schema_id}")
 
-    producer_config = {"bootstrap.servers": settings.KAFKA_URL}
+    producer_config = {
+        "bootstrap.servers": settings.KAFKA_URL,
+        "batch.num.messages": 1,
+        "queue.buffering.max.messages": 1,
+        "message.send.max.retries": 3,
+        "message.timeout.ms": 5000,
+    }
     producer = Producer(producer_config)
     producer.produce(
         topic=settings.TOPIC_KAFKA,
@@ -31,6 +37,7 @@ def send_message_to_kafka(data):
         ),
     )
     producer.flush()
+    logging.info("data sent to Kafka")
 
 
 def on_message(ws, message):
@@ -56,7 +63,8 @@ def on_open(ws):
 
 
 if __name__ == "__main__":
-    if settings.FINHUB_TRACE:
+    logging.basicConfig(level=logging.INFO)
+    if settings.DEBUG:
         websocket.enableTrace(True)
         logging.basicConfig(level=logging.DEBUG)
 

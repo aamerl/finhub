@@ -1,17 +1,13 @@
-kafka-topics.sh --list --bootstrap-server kafka:9092
+kafka-topics.sh --list --bootstrap-server kafka-0:9092
 
 kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic test_topic --from-beginning
-kafka-topics.sh --create -bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic test_topic
+kafka-topics.sh --create -bootstrap-server localhost:9092 --replication-factor 2 --partitions 2 --topic test_topic
 
 9cdeef654c96
 
 git config --global user.name "aamerl"
 
 
-schema_registry_url
-schema_name
-kafka_url
-topic_kafka
-symbol_to_read_from_finhub
-finhub_key_to_read_data
-finhub_api_url
+kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic trade1
+kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic test_topic
+kafka-topics.sh --bootstrap-server localhost:9092 --alter --topic trade1 --partitions 2 --replication-factor 2
