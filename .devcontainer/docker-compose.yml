@@ -13,11 +13,12 @@ services:
     environment:
       SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
       SCHEMA_SUBJECT_NAME: "trade_schema"
-      KAFKA_URL: "kafka:9092"
+      KAFKA_URL: "kafka-0:9092,kafka-1:9092"
       TOPIC_KAFKA: "trade1"
-      FINHUB_SYMBOLS: ""
+      FINHUB_SYMBOLS: "BINANCE:BTCUSDT,AAPL"
       FINHUB_SECRET_KEY: ${FINHUB_SECRET_KEY}
       FINHUB_API_URL: "wss://ws.finnhub.io?token="
+      FINHUB_TRACE: true
       FIRST_RUN: true
   kafka-0:
     image: docker.io/bitnami/kafka:${BITNAMI_KAFKA_VERSION}
@@ -81,6 +82,4 @@ networks:
     name: finhub
 volumes:
   kafka0_data:
-    driver: local
   kafka1_data:
-    driver: local

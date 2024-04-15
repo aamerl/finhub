@@ -7,25 +7,28 @@ from confluent_kafka.schema_registry import Schema, SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 
+import settings
+from utils import get_avro_schema
+
 
 def send_message_to_kafka(data):
-    schema_registry_url = "http://schema-registry:8081"
-    with open("trade.avsc") as f:
-        schema_str = f.read()
-
-    schema_registry_conf = {"url": schema_registry_url}
-    schema_registry_client = SchemaRegistryClient(schema_registry_conf)
+    schema_str = get_avro_schema()
+    schema_registry_client = SchemaRegistryClient({"url": settings.SCHEMA_REGISTRY_URL})
     avro_serializer = AvroSerializer(schema_registry_client, schema_str)
-    schema_id = schema_registry_client.register_schema(
-        "schema_test_1", Schema(schema_str, "AVRO")
-    )
-    print(schema_id)
 
-    producer_config = {"bootstrap.servers": "kafka:9092"}
+    if settings.FIRST_RUN:
+        schema_id = schema_registry_client.register_schema(
+            settings.SCHEMA_SUBJECT_NAME, Schema(schema_str, "AVRO")
+        )
+        logging.info(f"trade schema sent to schema registry with id  {schema_id}")
+
+    producer_config = {"bootstrap.servers": settings.KAFKA_URL}
     producer = Producer(producer_config)
     producer.produce(
-        topic="test1",
-        value=avro_serializer(data, SerializationContext("test1", MessageField.VALUE)),
+        topic=settings.TOPIC_KAFKA,
+        value=avro_serializer(
+            data, SerializationContext(settings.TOPIC_KAFKA, MessageField.VALUE)
+        ),
     )
     producer.flush()
 
@@ -34,33 +37,31 @@ def on_message(ws, message):
     message = json.loads(message)
     data = message.get("data")
     message_type = message.get("type")
-
     kafka_message = {"data": data, "type": message_type}
-
     send_message_to_kafka(kafka_message)
 
 
 def on_error(ws, error):
-    print(f"WebSocket Error: {error}")
+    logging.error(f"WebSocket Error: {error}")
 
 
 def on_close(ws, a, b):
-    print("WebSocket connection closed")
+    logging.info("WebSocket connection closed")
 
 
 def on_open(ws):
-    symbols = ["BINANCE:BTCUSDT", "AAPL"]
-    for symbol in symbols:
+    for symbol in settings.FINHUB_SYMBOLS.split(","):
         subscription_message = {"type": "subscribe", "symbol": symbol}
         ws.send(json.dumps(subscription_message))
 
 
 if __name__ == "__main__":
-    # websocket.enableTrace(True)
-    logging.basicConfig(level=logging.DEBUG)
-    KEY = "co3kaq9r01qj6vn838b0co3kaq9r01qj6vn838bg"
+    if settings.FINHUB_TRACE:
+        websocket.enableTrace(True)
+        logging.basicConfig(level=logging.DEBUG)
+
     ws = websocket.WebSocketApp(
-        f"wss://ws.finnhub.io?token={KEY}",
+        f"{settings.FINHUB_API_URL}{settings.FINHUB_SECRET_KEY}",
         on_message=on_message,
         on_error=on_error,
         on_close=on_close,
