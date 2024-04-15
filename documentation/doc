@@ -6,3 +6,12 @@ kafka-topics.sh --create -bootstrap-server localhost:9092 --replication-factor 1
 9cdeef654c96
 
 git config --global user.name "aamerl"
+
+
+schema_registry_url
+schema_name
+kafka_url
+topic_kafka
+symbol_to_read_from_finhub
+finhub_key_to_read_data
+finhub_api_url
