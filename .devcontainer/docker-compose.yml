@@ -10,6 +10,8 @@ services:
     container_name: producer
     command: sleep infinity
     network_mode: service:kafka-0
+
+
     environment:
       SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
       SCHEMA_SUBJECT_NAME: "trade_schema"
