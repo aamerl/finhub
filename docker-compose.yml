@@ -1,17 +1,18 @@
-version: '3.8'
+version: "3.8"
 
 services:
   producer:
     build:
-      context: ..
-      dockerfile: .devcontainer/Dockerfile
-    volumes:
-      - ../..:/workspaces:cached
+      context: .
+      dockerfile: Dockerfile
     container_name: producer
-    command: sleep infinity
-    network_mode: service:kafka-0
-
-
+    networks:
+      - finhub
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - schema-registry
+    tty: true
     environment:
       SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
       SCHEMA_SUBJECT_NAME: "trade_schema"
@@ -41,7 +42,7 @@ services:
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     volumes:
-      - 'kafka0_data:/bitnami/kafka'
+      - "kafka0_data:/bitnami/kafka"
       - ../init-kafka.sh:/init-kafka.sh
     # command: /bin/bash -c "chmod a+x ./init-kafka.sh && ./init-kafka.sh"
   kafka-1:
@@ -63,13 +64,13 @@ services:
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     volumes:
-      - 'kafka1_data:/bitnami/kafka'
+      - "kafka1_data:/bitnami/kafka"
   schema-registry:
     image: docker.io/bitnami/schema-registry:7.6
     container_name: schema-registry
     hostname: schema-registry
     ports:
-      - '8081:8081'
+      - "8081:8081"
     depends_on:
       - kafka-0
       - kafka-1

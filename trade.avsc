@@ -20,22 +20,22 @@
             "null"
           ],
           "doc" : "Trade conditions"
-        }, 
+        },
         {
           "name" : "p",
           "type" : "double",
           "doc" : "Price at which the stock was traded"
-        }, 
+        },
         {
           "name" : "s",
           "type" : "string",
           "doc" : "Symbol of a stock"
-        }, 
+        },
         {
           "name" : "t",
           "type" : "long",
           "doc" : "Timestamp at which the stock was traded"
-        }, 
+        },
         {
           "name" : "v",
           "type" : "double",
@@ -45,7 +45,7 @@
       "doc" : "Trades messages"
     },
     "doc"  : "Contains data inside a message"
-  }, 
+  },
   {
     "name" : "type",
     "type" : "string",
