@@ -35,7 +35,7 @@ repos:
       hooks:
           - id: tests
             name: run tests
-            entry: python -m unittest
+            entry: python3 -m unittest
             types: [python]
             stages: [commit, push]
             language: system

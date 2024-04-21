@@ -15,7 +15,7 @@ services:
       SCHEMA_SUBJECT_NAME: "trade_schema"
       KAFKA_URL: "kafka-0:9092,kafka-1:9092"
       TOPIC_KAFKA: "trade1"
-      FINHUB_SYMBOLS: "BINANCE:BTCUSDT,AAPL"
+      FINHUB_SYMBOLS: "BINANCE:BTCUSDT,AAPL,AMZN,ETHBTC"
       FINHUB_SECRET_KEY: ${FINHUB_SECRET_KEY}
       FINHUB_API_URL: "wss://ws.finnhub.io?token="
       FINHUB_TRACE: false
