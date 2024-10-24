@@ -2,7 +2,7 @@ import json
 import logging
 import unittest
 
-from utils import get_avro_schema
+from producer.utils import get_avro_schema
 
 
 class TestUtils(unittest.TestCase):
