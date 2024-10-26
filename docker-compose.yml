@@ -3,11 +3,7 @@ version: '3'
 services:
   producer:
     build:
-      dockerfile: .producer/Dockerfile
-    volumes:
-      - ./producer:/usr/app/
-    command: sleep infinity
-    network_mode: service:kafka-0
+      dockerfile: ./producer/Dockerfile
     container_name: producer
     environment:
       SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
@@ -19,19 +15,20 @@ services:
       FINHUB_API_URL: "wss://ws.finnhub.io?token="
       FINHUB_TRACE: false
       FIRST_RUN: false
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - schema-registry
+
   kafka-0:
     image: docker.io/bitnami/kafka:${BITNAMI_KAFKA_VERSION}
     hostname: kafka-0
     container_name: kafka-0
-    networks:
-      - finhub
     environment:
-      # KRaft settings
       - KAFKA_CFG_NODE_ID=0
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093
       - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-      # Listeners
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
@@ -40,20 +37,16 @@ services:
     volumes:
       - 'kafka0_data:/bitnami/kafka'
       - ../init-kafka.sh:/init-kafka.sh
-    # command: /bin/bash -c "chmod a+x ./init-kafka.sh && ./init-kafka.sh"
+
   kafka-1:
     image: docker.io/bitnami/kafka:${BITNAMI_KAFKA_VERSION}
     hostname: kafka-1
     container_name: kafka-1
-    networks:
-      - finhub
     environment:
-      # KRaft settings
       - KAFKA_CFG_NODE_ID=1
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093
       - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-      # Listeners
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
@@ -61,8 +54,9 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     volumes:
       - 'kafka1_data:/bitnami/kafka'
+
   schema-registry:
-    image: docker.io/bitnami/schema-registry:7.6
+    image: docker.io/bitnami/schema-registry:7.7.1
     container_name: schema-registry
     hostname: schema-registry
     ports:
@@ -73,9 +67,8 @@ services:
     environment:
       - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
       - SCHEMA_REGISTRY_KAFKA_BROKERS=PLAINTEXT://kafka-0:9092,PLAINTEXT://kafka-1:9092
-    networks:
-      - finhub
-    spark-master:
+  
+  spark-master:
     container_name: spark-master
     image: cluster-apache-spark:${SPARK_VERSION}
     ports:
@@ -95,9 +88,10 @@ services:
       - CASSANDRA_KEYSPACE=market
       - CASSANDRA_TRADE_TABLE=trades
       - CASSANDRA_SUMMARY_TABLE=running_averages_15_sec
-    networks:
-      - finhub
-
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - schema-registry
   spark-worker-a:
     container_name: spark-worker-a
     image: cluster-apache-spark:${SPARK_VERSION}
@@ -124,32 +118,22 @@ services:
     volumes:
       - ./apps:/opt/spark-apps
       - ./data:/opt/spark-data
-    networks:
-      - finhub
+
   cassandra:
     container_name: cassandra
     image: cassandra:3.11.3
     volumes:
       - ./cassandra/cassandra-setup.cql:/cassandra-setup.cql
-    networks:
-      - finhub
+
   grafana:
     container_name: grafana
     build:
-      context: ./grafana
-      dockerfile: Dockerfile
+      dockerfile: ./grafana/Dockerfile
     ports:
       - 3000:3000
-    networks:
-      - finhub
     volumes:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
       - ./grafana/datasources:/etc/grafana/datasources
-
-
-networks:
-  finhub:
-    name: finhub
 
 volumes:
   kafka0_data:

@@ -7,8 +7,8 @@ from confluent_kafka.schema_registry import Schema, SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 
-import producer.settings as settings
-from producer.utils import get_avro_schema
+import settings as settings
+from utils import get_avro_schema
 
 
 def send_message_to_kafka(data):
