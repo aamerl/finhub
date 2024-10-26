@@ -1,4 +1,4 @@
-# Financial Data Pipeline Project
+# Financial Data Pipeline
 
 This project implements a data processing pipeline that retrieves real-time financial data from the Finhub API, stores it in Kafka, processes it with Apache Spark, and stores it in Cassandra for long-term storage. The processed data is then visualized in Grafana.
 
