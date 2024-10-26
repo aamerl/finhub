@@ -8,3 +8,4 @@ spark/project/project/project/target/
 spark/project/project/project/metals.sbt
 spark/app/target/
 spark/.bloop
+__pycache__
