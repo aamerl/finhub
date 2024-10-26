@@ -76,7 +76,7 @@ services:
       - "7077:7077"
     volumes:
       - ./data:/opt/spark-data
-      - ./target/kafka_to_cassandra-1.0-SNAPSHOT.jar:/opt/spark-apps/app.jar
+      - ./target/sparkjob-1.0.jar:/opt/spark-apps/app.jar
     environment:
       - SPARK_LOCAL_IP=spark-master
       - SPARK_WORKLOAD=master
