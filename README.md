@@ -1,4 +1,3 @@
-
 # Financial Data Pipeline Project
 
 This project implements a data processing pipeline that retrieves real-time financial data from the Finhub API, stores it in Kafka, processes it with Apache Spark, and stores it in Cassandra for long-term storage. The processed data is then visualized in Grafana.
@@ -12,7 +11,7 @@ This project implements a data processing pipeline that retrieves real-time fina
 ## Configuration
 
 1. **.env File**: This file contains environment variables for configuration, including the Finhub API key.
-   
+
 2. **Docker Compose**: The `docker-compose.yml` file defines all required services, including Kafka, Spark, Cassandra, and Grafana.
 
 ## Installation and Execution Steps
@@ -65,6 +64,7 @@ docker exec -it producer python producer.py
 ![alt text](/docs/image-3.png)
 
 ## Services Structure
+![alt text](/docs/schema.png)
 
 ### `producer`
 
@@ -129,6 +129,30 @@ The `devcontainer` folder allows for local development and testing of the `produ
 
 ---
 
+## Pre-commit Hooks
+
+This project utilizes **pre-commit** to automatically run unit tests and other checks before code is committed. This ensures code quality and helps catch issues early in the development process.
+
+### Unit Tests
+
+- Unit tests are executed as part of the pre-commit hook. To run the tests manually, you can execute:
+
+  ```bash
+  python3 -m unittest
+  ```
+
+### Configuration
+
+Ensure you have the pre-commit hooks set up by running:
+
+```bash
+pre-commit install
+```
+
+This command installs the pre-commit hooks defined in the `.pre-commit-config.yaml` file, ensuring that the tests and other checks are run automatically during the commit process.
+
+---
+
 ## Data Structure Example
 
 ### Cassandra (trades)
@@ -147,13 +171,15 @@ CREATE TABLE IF NOT EXISTS market.trades (
 
 ### Kafka Schema File (trade.avsc)
 
-This JSON file defines the schema for data produced by `producer`.
+This file defines the schema for data produced by `producer`.
 
 ---
 
 ## Author and License
 
-Project by Lhoussaine Aamer (lhoussaine.aamer@outlook.fr), licensed under MIT.
+lhoussaine.aamer@outlook.fr
+
+licensed under MIT.
 
 ---
 
