@@ -6,13 +6,13 @@ services:
       dockerfile: ./producer/Dockerfile
     container_name: producer
     environment:
-      SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
-      SCHEMA_SUBJECT_NAME: "trade_schema"
+      SCHEMA_REGISTRY_URL: "${SCHEMA_REGISTRY_URL}"
+      SCHEMA_SUBJECT_NAME: "${SCHEMA_SUBJECT_NAME}"
       KAFKA_URL: "kafka-0:9092,kafka-1:9092"
-      TOPIC_KAFKA: "trade1"
-      FINHUB_SYMBOLS: "BINANCE:BTCUSDT,AAPL,AMZN,ETHBTC"
+      TOPIC_KAFKA: ${KAFKA_TOPIC}
+      FINHUB_SYMBOLS: "${FINHUB_SYMBOLS}"
       FINHUB_SECRET_KEY: ${FINHUB_SECRET_KEY}
-      FINHUB_API_URL: "wss://ws.finnhub.io?token="
+      FINHUB_API_URL: "${FINHUB_API_URL}"
       FINHUB_TRACE: false
       FIRST_RUN: false
     depends_on:
@@ -36,7 +36,7 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     volumes:
       - 'kafka0_data:/bitnami/kafka'
-      - ../init-kafka.sh:/init-kafka.sh
+      - ./kafka/init-kafka.sh:/init-kafka.sh
 
   kafka-1:
     image: docker.io/bitnami/kafka:${BITNAMI_KAFKA_VERSION}
@@ -56,7 +56,7 @@ services:
       - 'kafka1_data:/bitnami/kafka'
 
   schema-registry:
-    image: docker.io/bitnami/schema-registry:7.7.1
+    image: docker.io/bitnami/schema-registry:${SCHEMA_REGISTRY_VERSION}
     container_name: schema-registry
     hostname: schema-registry
     ports:
@@ -75,15 +75,15 @@ services:
       - "9090:8080"
       - "7077:7077"
     volumes:
-      - ./data:/opt/spark-data
-      - ./target/sparkjob-1.0.jar:/opt/spark-apps/app.jar
+      - ./spark/data:/opt/spark-data
+      - ./spark/target/scala-2.12/sparkjob-assembly-1.0-SNAPSHOT.jar:/opt/spark-apps/app.jar
     environment:
       - SPARK_LOCAL_IP=spark-master
       - SPARK_WORKLOAD=master
       - SPARK_MASTER=spark://spark-master:7077
       - KAFKA_BOOTSTRAP_SERVERS=kafka-0:9092,kafka-1:9092
-      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
-      - KAFKA_TOPIC=trade1
+      - SCHEMA_REGISTRY_URL=${SCHEMA_REGISTRY_URL}
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
       - CASSANDRA_HOST=cassandra
       - CASSANDRA_KEYSPACE=market
       - CASSANDRA_TRADE_TABLE=trades
@@ -92,8 +92,9 @@ services:
       - kafka-0
       - kafka-1
       - schema-registry
-  spark-worker-a:
-    container_name: spark-worker-a
+      - cassandra
+  spark-worker-0:
+    container_name: spark-worker-0
     image: cluster-apache-spark:${SPARK_VERSION}
     ports:
       - "9091:8080"
@@ -107,23 +108,27 @@ services:
       - SPARK_DRIVER_MEMORY=1G
       - SPARK_EXECUTOR_MEMORY=1G
       - SPARK_WORKLOAD=worker
-      - SPARK_LOCAL_IP=spark-worker-a
+      - SPARK_LOCAL_IP=spark-worker-0
       - KAFKA_BOOTSTRAP_SERVERS=kafka-0:9092,kafka-1:9092
-      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
-      - KAFKA_TOPIC=trade1
+      - SCHEMA_REGISTRY_URL=${SCHEMA_REGISTRY_URL}
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
       - CASSANDRA_HOST=cassandra
-      - CASSANDRA_KEYSPACE=market
-      - CASSANDRA_TRADE_TABLE=trades
-      - CASSANDRA_SUMMARY_TABLE=running_averages_15_sec
+      - CASSANDRA_KEYSPACE=${CASSANDRA_KEYSPACE}
+      - CASSANDRA_TRADE_TABLE=${CASSANDRA_TRADE_TABLE}
+      - CASSANDRA_SUMMARY_TABLE=${CASSANDRA_SUMMARY_TABLE}
     volumes:
-      - ./apps:/opt/spark-apps
-      - ./data:/opt/spark-data
+      - ./spark/apps:/opt/spark-apps
+      - ./spark/data:/opt/spark-data
 
   cassandra:
     container_name: cassandra
-    image: cassandra:3.11.3
+    hostname: cassandra
+    image: cassandra:5.0.2
     volumes:
       - ./cassandra/cassandra-setup.cql:/cassandra-setup.cql
+      - ./cassandra/init-cassandra.sh:/init-cassandra.sh
+    expose:
+      - 9042
 
   grafana:
     container_name: grafana
@@ -131,6 +136,8 @@ services:
       dockerfile: ./grafana/Dockerfile
     ports:
       - 3000:3000
+    depends_on:
+      - cassandra
     volumes:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
       - ./grafana/datasources:/etc/grafana/datasources

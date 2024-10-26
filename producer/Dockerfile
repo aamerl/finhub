@@ -11,5 +11,3 @@ RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requ
 
 COPY ./trade.avsc ./trade.avsc
 COPY ./producer .
-
-CMD ["python", "producer.py"]

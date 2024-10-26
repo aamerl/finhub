@@ -8,10 +8,8 @@ scalaVersion := "2.12.19"
 
 javacOptions ++= Seq("--release", "17")
 
-// Repositories
 resolvers += "Confluent" at "https://packages.confluent.io/maven/"
 
-// Dependencies
 libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % "3.5.1",
   "org.apache.spark" %% "spark-avro" % "3.5.1",
@@ -25,14 +23,11 @@ libraryDependencies ++= Seq(
 )
 
 ThisBuild / assemblyMergeStrategy := {
-  case PathList("META-INF/*.SF")  => MergeStrategy.discard
-  case PathList("META-INF/*.DSA") => MergeStrategy.discard
-  case PathList("META-INF/*.RSA") => MergeStrategy.discard
-  case _                          => MergeStrategy.first
+  case PathList("META-INF", _*) => MergeStrategy.discard
+  case _                        => MergeStrategy.first
 }
 
-lazy val app = (project in file("app"))
+lazy val app = (project in file("."))
   .settings(
-    assembly / mainClass := Some("org.finhub.sparkjob.SparkJob"),
-    assembly / assemblyJarName := "sparkjob.jar"
+    assembly / mainClass := Some("org.finhub.sparkjob.SparkJob")
   )

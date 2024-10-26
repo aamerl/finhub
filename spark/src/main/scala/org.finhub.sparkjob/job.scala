@@ -42,8 +42,9 @@ object SparkJob {
     start(kafkaConsumerProperties, abrisConfig)
   }
 
-  /** The processing code.
-    */
+  /*
+   * The processing code.
+   */
   private def start(
       kafkaConsumerProperties: Map[String, String],
       abrisConfig: FromAvroConfig

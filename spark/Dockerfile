@@ -1,4 +1,4 @@
-FROM openjdk:17-jdk-slim-buster as builder
+FROM openjdk:17-jdk-slim-buster AS builder
 RUN apt-get update && apt-get install -y wget
 ENV SPARK_VERSION=3.5.1 HADOOP_VERSION=3 SPARK_HOME=/opt/spark PYTHONHASHSEED=1
 # Download and uncompress spark from the apache archive
@@ -7,7 +7,7 @@ RUN wget --no-verbose -O apache-spark.tgz "https://archive.apache.org/dist/spark
     && tar -xf apache-spark.tgz -C /opt/spark --strip-components=1 \
     && rm apache-spark.tgz
 
-FROM builder as apache-spark
+FROM builder AS apache-spark
 WORKDIR /opt/spark
 ENV SPARK_MASTER_PORT=7077 \
     SPARK_MASTER_WEBUI_PORT=8080 \
