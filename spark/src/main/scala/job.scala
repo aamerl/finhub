@@ -1,116 +1,142 @@
-import org.apache.spark.sql._
+package org.finhub.sparkjob
+
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryException}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.avro.functions._
-import org.apache.spark.sql.streaming._
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.cassandra._
-
-import com.datastax.oss.driver.api.core.uuid.Uuids
-import com.datastax.spark.connector._
-
-import com.typesafe.config.{Config, ConfigFactory}
-
-import scala.io.Source
+import za.co.absa.abris.avro.functions
+import za.co.absa.abris.config.AbrisConfig
+import za.co.absa.abris.config.FromAvroConfig
+import java.util.concurrent.TimeoutException
+import java.util.logging.Logger
 
 object SparkJob {
-    def main(args:Array[String]): Unit =
-    {
-        // loading configuration
-        val conf: Config = ConfigFactory.load()
-        val settings: Settings = new Settings(conf)
-        
-        // loading trades schema
-        val tradesSchema: String = Source.fromInputStream( 
-            getClass.getResourceAsStream(settings.schemas("trades"))).mkString
+  val APP_NAME = "SparkJob"
+  val KAFKA_SOURCE_PROVIDER =
+    "org.apache.spark.sql.kafka010.KafkaSourceProvider"
+  val CASSANDRA_SOURCE_PROVIDER = "org.apache.spark.sql.cassandra"
+  val KAFKA_OFFSET_METHOD = "earliest"
+  val sparkjob_CLASS = "--class org.finhub.sparkjob.SparkJob"
+  val kafkaBootstrapServers = sys.env("KAFKA_BOOTSTRAP_SERVERS")
+  val sparkMaster = sys.env("SPARK_MASTER")
+  val cassandraHost = sys.env("CASSANDRA_HOST")
+  val schemaRegistryUrl = sys.env("SCHEMA_REGISTRY_URL")
+  val kafkaTopic = sys.env("KAFKA_TOPIC")
+  val cassandraKeyspace = sys.env("CASSANDRA_KEYSPACE")
+  val cassandraTradesTables = sys.env("CASSANDRA_TRADE_TABLE")
+  val cassandraSummaryTable = sys.env("CASSANDRA_SUMMARY_TABLE")
 
-        // udf for Cassandra uuids
-        val makeUUID = udf(() => Uuids.timeBased().toString)
-        
-        // create Spark session
-        val spark = SparkSession
-            .builder
-            .master(settings.spark("master"))
-            .appName(settings.spark("appName"))
-            .config("spark.cassandra.connection.host",settings.cassandra("host"))
-            .config("spark.cassandra.connection.host",settings.cassandra("host"))
-            .config("spark.cassandra.auth.username", settings.cassandra("username"))
-            .config("spark.cassandra.auth.password", settings.cassandra("password"))
-            .config("spark.sql.shuffle.partitions", settings.spark("shuffle_partitions"))
-            .getOrCreate()
-        
-        // proper processing code below
-        import spark.implicits._
+  val logger: Logger = Logger.getLogger(APP_NAME)
 
-        // read streams from Kafka
-        val inputDF = spark
-            .readStream
-            .format("kafka")
-            .option("kafka.bootstrap.servers",settings.kafka("server_address"))
-            .option("subscribe",settings.kafka("topic_market"))
-            .option("minPartitions", settings.kafka("min_partitions"))
-            .option("maxOffsetsPerTrigger", settings.spark("max_offsets_per_trigger"))
-            .option("useDeprecatedOffsetFetching",settings.spark("deprecated_offsets"))
-            .load()
+  def main(args: Array[String]): Unit = {
+    val kafkaConsumerProperties = Map(
+      "kafka.bootstrap.servers" -> kafkaBootstrapServers,
+      "startingOffsets" -> KAFKA_OFFSET_METHOD,
+      "subscribe" -> kafkaTopic
+    )
 
-        // explode the data from Avro
-        val expandedDF = inputDF
-            .withColumn("avroData",from_avro(col("value"),tradesSchema))
-            .select($"avroData.*")
-            .select(explode($"data"),$"type")
-            .select($"col.*")
+    val abrisConfig: FromAvroConfig =
+      AbrisConfig.fromConfluentAvro.downloadReaderSchemaByLatestVersion
+        .andTopicNameStrategy(kafkaTopic, false)
+        .usingSchemaRegistry(schemaRegistryUrl)
 
-        // rename columns and add proper timestamps
-         val finalDF = expandedDF
-            .withColumn("uuid", makeUUID())
-            .withColumnRenamed("c", "trade_conditions")
-            .withColumnRenamed("p", "price")
-            .withColumnRenamed("s", "symbol")
-            .withColumnRenamed("t","trade_timestamp")
-            .withColumnRenamed("v", "volume")
-            .withColumn("trade_timestamp",(col("trade_timestamp") / 1000).cast("timestamp"))
-            .withColumn("ingest_timestamp",current_timestamp().as("ingest_timestamp"))
+    start(kafkaConsumerProperties, abrisConfig)
+  }
 
-        // write query to Cassandra
-        val query = finalDF
-            .writeStream
-            .foreachBatch { (batchDF:DataFrame,batchID:Long) =>
-                println(s"Writing to Cassandra $batchID")
-                batchDF.write
-                    .cassandraFormat(settings.cassandra("trades"),settings.cassandra("keyspace"))
-                    .mode("append")
-                    .save()
-            }
-            .outputMode("update")
-            .start()
+  /** The processing code.
+    */
+  private def start(
+      kafkaConsumerProperties: Map[String, String],
+      abrisConfig: FromAvroConfig
+  ): Unit = {
+    // Create SparkSession
+    val spark: SparkSession = SparkSession
+      .builder()
+      .appName(APP_NAME)
+      .config("spark.cassandra.connection.host", cassandraHost)
+      .config("spark.master", sparkMaster)
+      .config("spark.class", sparkjob_CLASS)
+      .getOrCreate()
 
-        // another dataframe with aggregates - running averages from last 15 seconds
-        val summaryDF = finalDF
-            .withColumn("price_volume_multiply",col("price")*col("volume"))
-            .withWatermark("trade_timestamp","15 seconds")
-            .groupBy("symbol")
-            .agg(avg("price_volume_multiply"))
-    
-        //rename columns in dataframe and add UUIDs before inserting to Cassandra
-        val finalsummaryDF = summaryDF
-            .withColumn("uuid", makeUUID())
-            .withColumn("ingest_timestamp",current_timestamp().as("ingest_timestamp"))
-            .withColumnRenamed("avg(price_volume_multiply)","price_volume_multiply")
-        
-        // write second query to Cassandra
-        val query2 = finalsummaryDF
-            .writeStream
-            .trigger(Trigger.ProcessingTime("5 seconds"))
-            .foreachBatch { (batchDF:DataFrame,batchID:Long) =>
-                println(s"Writing to Cassandra $batchID")
-                batchDF.write
-                    .cassandraFormat(settings.cassandra("aggregates"),settings.cassandra("keyspace"))
-                    .mode("append")
-                    .save()
-            }
-            .outputMode("update")
-            .start()
-        
-        // let query await termination
-        spark.streams.awaitAnyTermination()
-    }
+    val tradeDf: Dataset[Row] = spark.readStream
+      .format(KAFKA_SOURCE_PROVIDER)
+      .options(kafkaConsumerProperties)
+      .load()
+
+    // Define the Cassandra write operation within foreachBatch
+    val expandedDF: Dataset[Row] = tradeDf
+      .withColumn("avroData", functions.from_avro(col("value"), abrisConfig))
+      .select(col("avroData.*"))
+      .select(explode(col("data")), col("type"))
+      .select(col("col.*"))
+
+    val finalDF: Dataset[Row] = getFinalDf(expandedDF)
+
+    // Write query to Cassandra for trade data
+    val finalQuery: StreamingQuery = finalDF.writeStream
+      .foreachBatch((batchDF: Dataset[Row], batchID: Long) => {
+        logger.info(s"Writing to Cassandra batch $batchID")
+        batchDF.write
+          .format(CASSANDRA_SOURCE_PROVIDER)
+          .option("keyspace", cassandraKeyspace)
+          .option("table", cassandraTradesTables)
+          .mode("append")
+          .save()
+      })
+      .outputMode("update")
+      .start()
+
+    val finalSummaryDF: Dataset[Row] = getSummaryDf(finalDF)
+
+    // Write second query to Cassandra for summary data
+    val summaryQuery: StreamingQuery = finalSummaryDF.writeStream
+      .foreachBatch((batchDF: Dataset[Row], batchID: Long) => {
+        logger.info(s"Writing to Cassandra batch $batchID")
+        batchDF.write
+          .format(CASSANDRA_SOURCE_PROVIDER)
+          .option("keyspace", cassandraKeyspace)
+          .option("table", cassandraSummaryTable)
+          .mode("append")
+          .save()
+      })
+      .outputMode("update")
+      .start()
+
+    finalQuery.awaitTermination()
+    summaryQuery.awaitTermination()
+  }
+
+  private def getFinalDf(expandedDF: Dataset[Row]): Dataset[Row] = {
+    // Rename columns and add proper timestamps
+    expandedDF
+      .withColumnRenamed("c", "trade_conditions")
+      .withColumnRenamed("p", "price")
+      .withColumnRenamed("s", "symbol")
+      .withColumnRenamed("t", "trade_timestamp")
+      .withColumnRenamed("v", "volume")
+      .withColumn(
+        "trade_timestamp",
+        to_timestamp(expr("trade_timestamp / 1000"))
+      )
+      .withColumn(
+        "ingest_timestamp",
+        current_timestamp().as("ingest_timestamp")
+      )
+  }
+
+  private def getSummaryDf(finalDF: Dataset[Row]): Dataset[Row] = {
+    // Create another dataframe with aggregates - running averages from the last 15 seconds
+    val summaryDF: Dataset[Row] = finalDF
+      .withColumn("price_volume_multiply", expr("price * volume"))
+      .withWatermark("trade_timestamp", "15 seconds")
+      .groupBy("symbol")
+      .agg(avg("price_volume_multiply"))
+
+    // Rename columns in dataframe and add UUIDs before inserting to Cassandra
+    summaryDF
+      .withColumn(
+        "ingest_timestamp",
+        current_timestamp().as("ingest_timestamp")
+      )
+      .withColumnRenamed("avg(price_volume_multiply)", "price_volume_multiply")
+  }
 }
